@@ -8,16 +8,23 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20SnapshotUpgradeable.sol";
 
 contract ImpressoMOCA is ERC20Upgradeable, UUPSUpgradeable, OwnableUpgradeable, PausableUpgradeable, ERC20SnapshotUpgradeable {
+    // NOTE: whitelist field is kept for storage layout compatibility (UUPS upgradeable)
     struct AccountData {
         uint48 lockedUntil;
-        uint8 whitelist;
+        uint8 whitelist; // Deprecated: kept for storage compatibility
         uint8 blacklist;
     }
     mapping(address => AccountData) private _accounts;
 
-    event Whitelisted(address indexed account, bool status);
+    // event Whitelisted(address indexed account, bool status); // Deprecated: removed for clarity
     event Blacklisted(address indexed account, bool status);
     event TokensLocked(address indexed account, uint256 until);
+
+    /// @dev Disable initializers on the implementation contract to prevent initialization attacks
+    // Remove constructor to comply with OpenZeppelin Upgrades (no constructor allowed)
+    // constructor() {
+    //     _disableInitializers();
+    // }
 
     function initialize(string memory name, string memory symbol) external initializer {
         __ERC20_init(name, symbol);
@@ -46,23 +53,12 @@ contract ImpressoMOCA is ERC20Upgradeable, UUPSUpgradeable, OwnableUpgradeable, 
         _unpause();
     }
 
-    // --- Whitelist/Blacklist ---
-    function setWhitelist(address account, bool status) external onlyOwner {
-        uint8 s = status ? 1 : 0;
-        if (_accounts[account].whitelist != s) {
-            _accounts[account].whitelist = s;
-            emit Whitelisted(account, status);
-        }
-    }
     function setBlacklist(address account, bool status) external onlyOwner {
         uint8 s = status ? 1 : 0;
         if (_accounts[account].blacklist != s) {
             _accounts[account].blacklist = s;
             emit Blacklisted(account, status);
         }
-    }
-    function isWhitelisted(address account) external view returns (bool) {
-        return _accounts[account].whitelist == 1;
     }
     function isBlacklisted(address account) external view returns (bool) {
         return _accounts[account].blacklist == 1;
