@@ -27,26 +27,39 @@ contract ImpressoMOCA is ERC20Upgradeable, UUPSUpgradeable, OwnableUpgradeable, 
     event Blacklisted(address indexed account, bool status);
     event TokensLocked(address indexed account, uint256 until);
 
+    // --- Batch Transfer ---
+    uint8 private _batchLimit;
+
+    event BatchLimitChanged(uint8 newLimit);
+
+    /// @notice Set the batch transfer limit (max 100)
+    function setBatchLimit(uint8 newLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newLimit > 0 && newLimit <= 100, "Batch limit must be 1-100");
+        _batchLimit = newLimit;
+        emit BatchLimitChanged(newLimit);
+    }
+
+    /// @notice Returns the current batch transfer limit
+    function batchLimit() external view returns (uint8) {
+        return _batchLimit;
+    }
+
+    /// @notice Batch transfer tokens to multiple addresses
+    /// @param recipients Array of recipient addresses
+    /// @param amounts Array of amounts to transfer (must match recipients)
+    function batchTransfer(address[] calldata recipients, uint256[] calldata amounts) external whenNotPaused {
+        require(recipients.length == amounts.length, "Array length mismatch");
+        require(recipients.length > 0 && recipients.length <= _batchLimit, "Exceeds batch limit");
+        for (uint256 i = 0; i < recipients.length; i++) {
+            _transfer(msg.sender, recipients[i], amounts[i]);
+        }
+    }
+
     /// @dev Disable initializers on the implementation contract to prevent initialization attacks
     // Remove constructor to comply with OpenZeppelin Upgrades (no constructor allowed)
     // constructor() {
     //     _disableInitializers();
     // }
-
-    function initialize(string memory name, string memory symbol) external initializer {
-        __ERC20_init(name, symbol);
-        __Ownable_init();
-        __Pausable_init();
-        __ERC20Snapshot_init();
-        __AccessControl_init();
-        // Grant roles to deployer (msg.sender)
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
-        _grantRole(UPGRADER_ROLE, msg.sender);
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
 
     // --- Mintable & Burnable ---
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) whenNotPaused {
@@ -103,6 +116,24 @@ contract ImpressoMOCA is ERC20Upgradeable, UUPSUpgradeable, OwnableUpgradeable, 
         super._beforeTokenTransfer(from, to, amount);
     }
 
+    // --- In initialize(), set default batch limit ---
+    function initialize(string memory name, string memory symbol) external initializer {
+        __ERC20_init(name, symbol);
+        __Ownable_init();
+        __Pausable_init();
+        __ERC20Snapshot_init();
+        __AccessControl_init();
+        // Grant roles to deployer (msg.sender)
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
+        _batchLimit = 100; // Default batch limit
+    }
+
+    /// @dev Required by UUPSUpgradeable to authorize upgrades
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+
     // Reserve storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 }
